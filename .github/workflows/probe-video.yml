@@ -13,5 +13,5 @@ jobs:
     steps:
       - name: Install downloader
         run: python -m pip install --user -U "yt-dlp[default]"
-      - name: Check formats with JavaScript runtime
-        run: ~/.local/bin/yt-dlp --js-runtimes node --no-playlist --verbose -F 'https://youtu.be/1gviYs7eF0c?si=hiW4O5dKcVO8LR4O'
+      - name: Check Android client
+        run: ~/.local/bin/yt-dlp --js-runtimes node --extractor-args 'youtube:player_client=android' --no-playlist --verbose -F 'https://youtu.be/1gviYs7eF0c?si=hiW4O5dKcVO8LR4O'
