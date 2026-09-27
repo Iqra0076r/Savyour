@@ -8,6 +8,10 @@ Install `ffmpeg` on the backend machine. In `backend`, run `pip install -r requi
 
 ## Deployment
 
+### No-card single-service host
+
+The root `Dockerfile` packages the React build and FastAPI API in one service, so the frontend calls its own origin. On [blitz.cloud](https://blitz.cloud/docs/deploy-from-github/), create a free account, choose **Host something new → My own code**, paste this public repository URL, select `main`, and choose the root `Dockerfile`. The app uses port `8080`; choose the address provided by the host. Its free plan currently needs no payment card, but account creation and email verification are required. Once live, test `/api/health` and the site at the same address. To keep the existing GitHub Pages address, set the repository Actions variable `VITE_API_URL` to the new HTTPS address and rerun the Pages workflow.
+
 The GitHub Actions workflow deploys `frontend` to GitHub Pages from `main`. Set repository variable `VITE_API_URL` to the HTTPS URL of your deployed backend (without a trailing slash). GitHub Pages cannot run Python or ffmpeg.
 
 For the free backend option, [deploy the Render Blueprint](https://render.com/deploy?repo=https://github.com/Iqra0076r/Savyour) from this repository. The root `render.yaml` configures a Docker web service and its CORS origin. The frontend is preconfigured for `https://saveflow-savyour-api.onrender.com`. If Render assigns a different URL, set the GitHub Actions repository variable `VITE_API_URL` to the actual HTTPS service URL, then rerun the Pages workflow. The health check is `/api/health`. Render free web services spin down after inactivity; the first request after idle can be slow, and video transfers may exceed free tier time, memory or bandwidth limits.

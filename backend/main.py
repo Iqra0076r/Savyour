@@ -12,6 +12,7 @@ import yt_dlp
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
@@ -93,3 +94,7 @@ async def download(link: Download):
     except (asyncio.TimeoutError,yt_dlp.utils.DownloadError,ValueError) as e:
         shutil.rmtree(folder,ignore_errors=True)
         raise HTTPException(422,f'Download unavailable: {str(e)[:220]}')
+
+static_dir = Path(os.getenv('STATIC_DIR', '/app/frontend/dist'))
+if static_dir.is_dir():
+    app.mount('/', StaticFiles(directory=static_dir, html=True), name='site')
