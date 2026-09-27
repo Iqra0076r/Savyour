@@ -28,7 +28,7 @@ jobs:
         working-directory: frontend
         env:
           GITHUB_PAGES_BASE: /Savyour/
-          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://saveflow-savyour-api.onrender.com' }}
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://savyour.blitz.cloud' }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: frontend/dist

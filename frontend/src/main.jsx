@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { ArrowDownToLine, ArrowRight, Check, Clipboard, Link2, LoaderCircle, Moon, Play, ShieldCheck, Sparkles, Sun, X } from 'lucide-react';
 import './style.css';
 
-const API = import.meta.env.VITE_API_URL || (location.hostname === 'localhost' ? 'http://localhost:8000' : location.hostname.endsWith('github.io') ? 'https://saveflow-savyour-api.onrender.com' : location.origin);
+const API = import.meta.env.VITE_API_URL || (location.hostname === 'localhost' ? 'http://localhost:8000' : location.hostname.endsWith('github.io') ? 'https://savyour.blitz.cloud' : location.origin);
 const platforms = [
   ['YouTube','Videos & Shorts','▶','youtube'], ['TikTok','Public videos','♪','tiktok'],
   ['Instagram','Reels & posts','◎','instagram'], ['Facebook','Public videos','f','facebook'],
