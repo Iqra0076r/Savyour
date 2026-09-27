@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { ArrowDownToLine, ArrowRight, Check, Clipboard, Link2, LoaderCircle, Moon, Play, ShieldCheck, Sparkles, Sun, X } from 'lucide-react';
 import './style.css';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API = import.meta.env.VITE_API_URL || (location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://saveflow-savyour-api.onrender.com');
 const platforms = [
   ['YouTube','Videos & Shorts','▶','youtube'], ['TikTok','Public videos','♪','tiktok'],
   ['Instagram','Reels & posts','◎','instagram'], ['Facebook','Public videos','f','facebook'],
@@ -29,7 +29,7 @@ function App(){
       const data=await response.json(); if(seq!==current.current) return;
       if(!response.ok) throw Error(data.detail || 'Could not analyze this link.');
       setResult(data);
-    }catch(e){if(seq===current.current) setError(e.message || 'Connection to download server failed.');}
+    }catch(e){if(seq===current.current) setError(e instanceof TypeError ? 'The download server is unavailable. Please try again shortly; a free server may need time to wake up.' : (e.message || 'Connection to download server failed.'));}
     finally{if(seq===current.current) setWorking(false);}
   }
   function onChange(v){setUrl(v);setResult(null);setError('');clearTimeout(timer.current);++current.current;setWorking(false);
@@ -42,7 +42,7 @@ function App(){
       const blob=await response.blob(); const object=URL.createObjectURL(blob);const a=document.createElement('a');a.href=object;
       const disposition=response.headers.get('content-disposition')||'';const match=disposition.match(/filename\*=UTF-8''([^;]+)/i);
       a.download=match?decodeURIComponent(match[1]):'saveflow-video.mp4';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(object),60000);
-    }catch(e){setError(e.message || 'Download failed.');}finally{setDownloading(false);}
+    }catch(e){setError(e instanceof TypeError ? 'The download server is unavailable. Please try again shortly.' : (e.message || 'Download failed.'));}finally{setDownloading(false);}
   }
   useEffect(()=>()=>clearTimeout(timer.current),[]);
   const chosen=result?.formats.find(f=>f.id===selected);
