@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: saveflow-savyour-api
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: FRONTEND_ORIGINS
+        value: https://iqra0076r.github.io
