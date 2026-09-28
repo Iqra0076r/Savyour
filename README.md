@@ -1,6 +1,12 @@
-# SaveFlow
+# Savyour
 
 React frontend and FastAPI/yt-dlp backend for analyzing public social video links, displaying available formats, and downloading media the user is authorized to save.
+
+## Website pages and SEO
+
+The frontend builds five standalone URLs: `/`, `/supported-sites/`, `/how-it-works/`, `/faq/`, and `/about/`. Each has a descriptive title, meta description, canonical URL, Open Graph and social card tags, accessible navigation, visible page content, and appropriate structured data. The build also creates `robots.txt`, `sitemap.xml`, a social preview image, and Savyour icons. The design has one dark theme.
+
+`https://savyour.blitz.cloud` is the current canonical site. When moving the public site to a paid host or custom domain, set `VITE_SITE_URL` to its HTTPS origin during the frontend build so canonical URLs, social cards, and the sitemap point to the new domain. The GitHub Pages copy uses the same canonical site to avoid duplicate page URLs. Submit the canonical sitemap in Google Search Console after the public deployment; indexing and ranking depend on search engines and the value of the published content, not metadata alone.
 
 ## Local development
 

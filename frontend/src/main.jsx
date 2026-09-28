@@ -1,26 +1,45 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ArrowDownToLine, ArrowRight, Check, Clipboard, Link2, LoaderCircle, Moon, Play, ShieldCheck, Sparkles, Sun, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowRight, Check, Clipboard, Link2, LoaderCircle, Play, ShieldCheck, Sparkles, X } from 'lucide-react';
 import './style.css';
 
+const BASE = import.meta.env.BASE_URL;
+const path = slug => `${BASE}${slug}`;
+const page = location.pathname.startsWith(BASE) ? location.pathname.slice(BASE.length).replace(/\/$/, '') : '';
 const API = import.meta.env.VITE_API_URL || (location.hostname === 'localhost' ? 'http://localhost:8000' : location.hostname.endsWith('github.io') ? 'https://savyour.blitz.cloud' : location.origin);
+const nav = [['', 'Downloader'], ['supported-sites', 'Supported Sites'], ['how-it-works', 'How It Works'], ['faq', 'FAQ'], ['about', 'About']];
 const platforms = [
-  ['YouTube','Videos & Shorts','▶','youtube'], ['TikTok','Public videos','♪','tiktok'],
-  ['Instagram','Reels & posts','◎','instagram'], ['Facebook','Public videos','f','facebook'],
-  ['X','Public posts','𝕏','x'], ['Vimeo','Permitted videos','v','vimeo'],
-  ['Pinterest','Public video pins','p','pinterest']
+  ['YouTube', 'Public videos & Shorts · up to 480p', '▶', 'youtube'],
+  ['TikTok', 'Public videos', '♪', 'tiktok'],
+  ['Instagram', 'Public Reels & video posts', '◎', 'instagram'],
+  ['Facebook', 'Public video posts', 'f', 'facebook'],
+  ['X', 'Public video posts', '𝕏', 'x'],
+  ['Vimeo', 'Publicly accessible videos', 'v', 'vimeo'],
+  ['Pinterest', 'Public video pins', 'p', 'pinterest'],
+  ['Reddit', 'Public video posts', '●', 'reddit'],
 ];
 const faqs = [
-  ['Which sites can I use?', 'SaveFlow supports public videos from the listed platforms when the source permits access. Availability can change as platforms update their services.'],
-  ['Why might a link fail?', 'Private posts, login walls, geographic restrictions, expired links, and platform changes can prevent analysis or downloading. Try a public individual video link.'],
-  ['Which quality will I get?', 'Choose Best available to request the highest video and audio combination the source provides. Specific resolutions depend on that video.'],
-  ['Can I save any video?', 'Save only media you own or have permission to download. Respect creators and the rules of the source platform.']
+  ['Which platforms does Savyour support?', 'Savyour can analyze public links from YouTube, TikTok, Instagram, Facebook, X, Vimeo, Pinterest, and Reddit. Individual videos may still be unavailable because each platform controls access to its media.'],
+  ['Why is YouTube limited to 480p?', 'In this setup, higher YouTube formats have not downloaded reliably. The quality picker and backend therefore limit YouTube to formats at or below 480p. Other platforms keep their best available quality.'],
+  ['Why does a thumbnail show but the download fail?', 'A platform may expose video details while restricting its media streams. Private videos, login requirements, regional restrictions, expired links, or changes to a platform can also prevent downloads.'],
+  ['Can I choose a video quality?', 'Yes. After Savyour analyzes a link, choose a displayed format or Best available. The quality and file type depend on what the source provides. YouTube choices are capped at 480p.'],
+  ['What happens while a video is preparing?', 'The progress bar reports the current media stream as it downloads. When separate video and audio streams are available, it then shows the combining stage and progress while the file is saved to your computer.'],
+  ['Do I need to sign in or install an extension?', 'The website has no Savyour sign-in or browser extension. Some source platforms require their own login and may not allow this tool to access the video.'],
+  ['Which videos am I allowed to save?', 'Only save media you own or have permission to download. Respect creators, copyright, privacy, and the rules of the platform hosting the video.'],
 ];
-function App(){
+function Logo(){ return <img className="brand-logo" src={path('logo.svg')} alt="Savyour" width="184" height="50"/>; }
+function Header(){ return <header><a className="brand" href={path('')} aria-label="Savyour home"><Logo/></a><nav aria-label="Primary navigation">{nav.map(([slug,label])=><a className={page===slug?'active':''} href={path(slug?`${slug}/`:'')} key={slug} aria-current={page===slug?'page':undefined}>{label}</a>)}</nav></header>; }
+function Footer(){return <footer><a className="brand" href={path('')}><Logo/></a><div className="footer-links">{nav.map(([slug,label])=><a key={slug} href={path(slug?`${slug}/`:'')}>{label}</a>)}</div><small>© {new Date().getFullYear()} Savyour · Only save content you own or are authorized to download.</small></footer>;}
+function PageIntro({eyebrow, title, accent, description}){return <div className="page-intro"><span className="eyebrow"><Sparkles size={14}/>{eyebrow}</span><h1>{title} <em>{accent}</em></h1><p>{description}</p></div>;}
+function PlatformCards(){return <div className="platform-grid">{platforms.map(([name,description,symbol,cls])=><a href={path('')} className={`platform-card ${cls}`} key={name}><span className="platform-icon">{symbol}</span><span className="platform-copy"><strong>{name}</strong><small>{description}</small><span className="supported"><Check size={14}/> Public links</span></span><ArrowRight className="card-arrow" size={19}/></a>)}</div>;}
+function SupportedSites(){return <section className="page-section"><PageIntro eyebrow="ONE LINK. YOUR FAVORITE PLATFORMS." title="Supported video" accent="sites." description="Explore public video sources Savyour can analyze. Availability varies by platform, video, and location."/><PlatformCards/><div className="info-panel"><h2>What counts as a supported link?</h2><p>Paste the URL of an individual public video, Short, Reel, post, or video pin. Profile pages, private posts, playlists, and links that require source account access may not work. YouTube downloads are currently limited to 480p; other platforms offer their best available quality.</p><a className="button primary" href={path('')}><ArrowDownToLine size={18}/> Open Downloader</a></div></section>;}
+function HowItWorks(){const steps=[['01','Paste a public link','Copy the URL of an individual video on a supported platform and paste it into Savyour. The site checks the platform and fetches the video details.'],['02','Check the preview and formats','Review the thumbnail, title, creator, and available resolutions. Choose Best available or select a listed quality; YouTube is capped at 480p.'],['03','Save with live progress','Savyour downloads the available media streams, combines video and audio when required, and shows progress as the final file is saved to your computer.']];return <section className="page-section"><PageIntro eyebrow="PASTE. PREVIEW. SAVE." title="How Savyour" accent="works." description="A straightforward way to save public videos you own or have permission to download."/><div className="steps detailed">{steps.map(([n,t,d])=><article className="step" key={n}><b>{n}</b><h2>{t}</h2><p>{d}</p></article>)}</div><div className="info-panel"><h2>Before you download</h2><p>The source platform determines which media streams are accessible. A preview can load even when a download is blocked by a login requirement, regional rule, or platform change. Savyour does not bypass those restrictions. Save only media you own or are authorized to download.</p><a className="button primary" href={path('')}><ArrowDownToLine size={18}/> Try the Downloader</a></div></section>;}
+function FAQ(){return <section className="page-section"><PageIntro eyebrow="ANSWERS, WITHOUT THE GUESSWORK." title="Frequently asked" accent="questions." description="Quick answers about supported sites, video quality, progress, and failed links."/><div className="faq-list">{faqs.map(([q,a])=><details className="faq-item" key={q}><summary>{q}<span aria-hidden="true">+</span></summary><p>{a}</p></details>)}</div><div className="info-panel"><h2>Ready to try a link?</h2><p>Open the downloader and paste a public video URL to see which formats are available.</p><a className="button primary" href={path('')}><ArrowDownToLine size={18}/> Open Downloader</a></div></section>;}
+function About(){return <section className="page-section"><PageIntro eyebrow="YOUR MEDIA. YOUR FLOW." title="Meet" accent="Savyour." description="A focused space for previewing and saving public video links when you have permission to keep the media."/><div className="about-grid"><article className="info-panel"><h2>What we built</h2><p>Savyour brings link analysis, thumbnails, available quality choices, and file saving into one clear workflow. The interface works on desktop and mobile browsers, with visible progress while media is prepared.</p></article><article className="info-panel"><h2>How access works</h2><p>Savyour handles public links from supported platforms. Access depends on the video and the platform. Some links cannot be downloaded because they are private, require login, are region restricted, or have changed since analysis.</p></article><article className="info-panel"><h2>Respect for creators</h2><p>Use Savyour to save your own media or content you are authorized to download. The creator and source platform retain their rights and rules. We do not claim that every public link can be saved.</p></article></div><a className="button primary about-cta" href={path('')}><ArrowDownToLine size={18}/> Go to Downloader</a></section>;}
+function Downloader(){
   const [url,setUrl]=useState(''), [result,setResult]=useState(null), [selected,setSelected]=useState('best');
   const [working,setWorking]=useState(false), [downloading,setDownloading]=useState(false), [error,setError]=useState('');
   const [progress,setProgress]=useState(null);
-  const [light,setLight]=useState(false), [open,setOpen]=useState(-1), [active,setActive]=useState('downloader');
   const timer=useRef(null), current=useRef(0), input=useRef(null);
   async function analyze(value){
     const v=value.trim(); if(!v) return;
@@ -30,73 +49,37 @@ function App(){
       const data=await response.json(); if(seq!==current.current) return;
       if(!response.ok) throw Error(data.detail || 'Could not analyze this link.');
       setResult(data);
-    }catch(e){if(seq===current.current) setError(e instanceof TypeError ? 'The download server is unavailable. Please try again shortly; a free server may need time to wake up.' : (e.message || 'Connection to download server failed.'));}
+    }catch(e){if(seq===current.current) setError(e instanceof TypeError?'The download server is unavailable. Please try again shortly.':(e.message||'Could not analyze this link.'));}
     finally{if(seq===current.current) setWorking(false);}
   }
-  function onChange(v){setUrl(v);setResult(null);setError('');clearTimeout(timer.current);++current.current;setWorking(false);
-    if(/^https:\/\/\S+\.[^\s]+/.test(v.trim())) timer.current=setTimeout(()=>analyze(v),650);
-  }
+  function onChange(v){setUrl(v);setResult(null);setError('');clearTimeout(timer.current);++current.current;setWorking(false);if(/^https:\/\/\S+\.[^\s]+/.test(v.trim())) timer.current=setTimeout(()=>analyze(v),650);}
   async function paste(){try{onChange(await navigator.clipboard.readText());input.current?.focus();}catch{setError('Clipboard access unavailable. Paste the link into the field.');}}
-  async function download(){if(!url || downloading) return; setDownloading(true);setError('');setProgress({label:'Connecting to source…',percent:null});
+  async function download(){if(!url||downloading) return;setDownloading(true);setError('');setProgress({label:'Connecting to source…',percent:null});
     try{
-      // Save large files straight to disk on supported desktop browsers.
-      const handle=window.showSaveFilePicker ? await window.showSaveFilePicker({suggestedName:`${(result?.title||'saveflow-video').replace(/[\\/:*?"<>|]/g,'').slice(0,90)}.mp4`,types:[{description:'Video',accept:{'video/mp4':['.mp4'],'video/webm':['.webm']}}]}) : null;
+      const ext=selected==='best'?'mp4':(result?.formats.find(f=>f.id===selected)?.ext||'mp4');
+      const handle=window.showSaveFilePicker?await window.showSaveFilePicker({suggestedName:`${(result?.title||'savyour-video').replace(/[\\/:*?"<>|]/g,'').slice(0,90)}.${ext}` }):null;
       const started=await fetch(`${API}/api/download/start`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,format_id:selected})});
-      const startData=await started.json();
-      if(!started.ok) throw Error(startData.detail || 'Could not start download.');
-      while(true){
-        await new Promise(resolve=>setTimeout(resolve,1000));
-        const poll=await fetch(`${API}/api/download/${startData.id}`);
-        const state=await poll.json();
-        if(!poll.ok) throw Error(state.detail || 'Download status unavailable.');
-        if(state.status==='error') throw Error(state.detail);
-        if(state.status==='ready') break;
-        const amount=state.percent!=null ? ` ${state.percent}%` : state.bytes ? ` ${(state.bytes/1048576).toFixed(1)} MB` : '';
-        setProgress({label:`${state.detail || 'Downloading'}${amount}`,percent:state.percent});
-      }
-      setProgress({label:'Saving to your computer…',percent:null});
-      const response=await fetch(`${API}/api/download/${startData.id}/file`);
-      if(!response.ok){const data=await response.json();throw Error(data.detail || 'Download failed.');}
-      const total=Number(response.headers.get('content-length')) || null;
-      let received=0;
-      function showSaving(bytes){received+=bytes;setProgress({label:`Saving to your computer · ${(received/1048576).toFixed(1)} MB`,percent:total?Math.round(100*received/total):null,phase:'save'});}
+      const startData=await started.json();if(!started.ok) throw Error(startData.detail||'Could not start download.');
+      while(true){await new Promise(resolve=>setTimeout(resolve,1000));const poll=await fetch(`${API}/api/download/${startData.id}`);const state=await poll.json();if(!poll.ok) throw Error(state.detail||'Download status unavailable.');if(state.status==='error') throw Error(state.detail);if(state.status==='ready') break;const amount=state.percent!=null?` ${state.percent}%`:state.bytes?` ${(state.bytes/1048576).toFixed(1)} MB`:'';setProgress({label:`${state.detail||'Downloading'}${amount}`,percent:state.percent});}
+      setProgress({label:'Saving to your computer…',percent:null});const response=await fetch(`${API}/api/download/${startData.id}/file`);if(!response.ok){const data=await response.json();throw Error(data.detail||'Download failed.');}
+      const total=Number(response.headers.get('content-length'))||null;let received=0;function showSaving(bytes){received+=bytes;setProgress({label:`Saving to your computer · ${(received/1048576).toFixed(1)} MB`,percent:total?Math.round(100*received/total):null,phase:'save'});}
       if(handle){const writer=await handle.createWritable();try{const reader=response.body.getReader();while(true){const {done,value}=await reader.read();if(done) break;await writer.write(value);showSaving(value.length)}await writer.close()}catch(e){await writer.abort();throw e}return;}
       const chunks=[];const reader=response.body.getReader();while(true){const {done,value}=await reader.read();if(done) break;chunks.push(value);showSaving(value.length)}
-      const blob=new Blob(chunks,{type:response.headers.get('content-type')||'application/octet-stream'}); const object=URL.createObjectURL(blob);const a=document.createElement('a');a.href=object;
-      const disposition=response.headers.get('content-disposition')||'';const match=disposition.match(/filename\*=UTF-8''([^;]+)/i);
-      a.download=match?decodeURIComponent(match[1]):'saveflow-video.mp4';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(object),60000);
-    }catch(e){if(e.name!=='AbortError') setError(e instanceof TypeError ? 'The download server is unavailable. Please try again shortly.' : (e.message || 'Download failed.'));}finally{setDownloading(false);setProgress(null);}
+      const blob=new Blob(chunks,{type:response.headers.get('content-type')||'application/octet-stream'});const object=URL.createObjectURL(blob);const a=document.createElement('a');a.href=object;const disposition=response.headers.get('content-disposition')||'';const match=disposition.match(/filename\*=UTF-8''([^;]+)/i);a.download=match?decodeURIComponent(match[1]):'savyour-video.mp4';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(object),60000);
+    }catch(e){if(e.name!=='AbortError') setError(e instanceof TypeError?'The download server is unavailable. Please try again shortly.':(e.message||'Download failed.'));}finally{setDownloading(false);setProgress(null);}
   }
   useEffect(()=>()=>clearTimeout(timer.current),[]);
   const chosen=result?.formats.find(f=>f.id===selected);
   const formatLabel=f=>`${f.height?`${f.height}p`:'Video'} · ${(f.ext||'video').toUpperCase()}${f.has_audio?' · audio':''}${f.size?` · ${(f.size/1048576).toFixed(1)} MB`:''}`;
-  return <div className={`app ${light?'light':''}`}>
-    <div className="aurora aurora-a"/><div className="aurora aurora-b"/><div className="orb orb-a"/><div className="orb orb-b"/>
-    <div className="site-shell">
-      <header><a className="brand" href="#downloader" onClick={()=>setActive('downloader')}><span className="mark">S</span><span>SaveFlow</span></a>
-        <nav aria-label="Primary navigation">{[['downloader','Downloader'],['sites','Supported Sites'],['how','How It Works'],['faq','FAQ']].map(([id,label])=><a className={active===id?'active':''} onClick={()=>setActive(id)} href={`#${id}`} key={id}>{label}</a>)}</nav>
-        <button className="theme" title="Toggle theme" aria-label="Toggle theme" onClick={()=>setLight(!light)}>{light?<Sun size={18}/>:<Moon size={18}/>}</button>
-      </header>
-      <main>
-        <section className="hero" id="downloader"><div className="eyebrow"><Sparkles size={14}/> YOUR MEDIA. YOUR FLOW.</div>
-          <h1>Download Social<br/><span>Videos Easily.</span></h1>
-          <p className="lead">Paste a public video link and save media you own or have permission to download.</p>
-          <form onSubmit={e=>{e.preventDefault();clearTimeout(timer.current);analyze(url)}} className="link-form">
-            <Link2 size={21}/><input ref={input} type="url" value={url} onChange={e=>onChange(e.target.value)} placeholder="Paste video URL here..." aria-label="Video URL" required/>
-            {url&&<button type="button" className="icon-clear" onClick={()=>onChange('')} aria-label="Clear link"><X size={18}/></button>}
-            <span className="detect">{working?<><LoaderCircle size={16} className="spin"/> Analyzing</>:result?<><Check size={16}/> Ready</>:'PASTE A LINK'}</span>
-          </form>
-          <div className="hero-actions"><button className="button ghost" onClick={paste}><Clipboard size={18}/> Paste Link</button><button className="button primary" onClick={()=>result?download():analyze(url)} disabled={!url||working||downloading}>{working||downloading?<LoaderCircle size={18} className="spin"/>:<ArrowDownToLine size={18}/>} {result?(downloading?'Preparing file...':'Download Best Quality'):(working?'Analyzing...':'Analyze Link')}</button></div>
-          {progress&&<div role="status" className="download-progress"><div className="download-progress-label"><LoaderCircle size={16} className="spin"/> {progress.label}</div><progress max="100" value={progress.percent==null?undefined:progress.percent} aria-label="Download progress"/><small>{progress.percent==null?'Working…':`${progress.percent}% ${progress.phase==='save'?'saved':'of current stream'}`}</small></div>}
-          {error&&<div role="alert" className="error">{error}</div>}
-          {result&&<div className="result"><div className="preview">{result.thumbnail?<img src={result.thumbnail} alt="Video thumbnail" referrerPolicy="no-referrer"/>:<div className="no-image"><Play size={36}/></div>}<span className="play"><Play fill="currentColor" size={21}/></span></div><div className="result-info"><span className="pill ready"><Check size={14}/> VIDEO READY</span><h2>{result.title}</h2><p>{result.creator||'Public video'} · {result.platform||'Supported platform'}</p><label htmlFor="quality">Choose quality</label><select id="quality" value={selected} onChange={e=>setSelected(e.target.value)}><option value="best">{result.max_quality?'Best available up to 480p + audio':'Best available video + audio'}</option>{result.formats.map(f=><option key={f.id} value={f.id}>{formatLabel(f)}</option>)}</select><button className="button primary full" onClick={download} disabled={downloading}>{downloading?<LoaderCircle className="spin" size={18}/>:<ArrowDownToLine size={18}/>} {downloading?'Preparing download...':`Download ${chosen?.height?`${chosen.height}p`:result.max_quality?'up to 480p':'video'}`}</button><small>{result.max_quality?'YouTube is limited to 480p for reliable downloads.':'Best quality may require a few moments to combine video and audio.'}</small></div></div>}
-          {!result&&<div className="platform-pills">{platforms.map(([name,,symbol,cls])=><span key={name}><b className={`mini ${cls}`}>{symbol}</b>{name}</span>)}</div>}
-          <div className="trust"><span><Sparkles size={16}/> Easy to use</span><i/> <span><ShieldCheck size={16}/> Privacy focused</span><i/> <span>∞ &nbsp; No software</span></div>
-        </section>
-        <section className="section sites" id="sites"><div className="section-top"><span className="eyebrow">ONE LINK. YOUR FAVORITE PLATFORMS.</span><h2>Made for the places<br/><em>you create.</em></h2><p>Explore the public video sources SaveFlow can analyze.</p></div><div className="platform-grid">{platforms.map(([name,description,symbol,cls])=><button key={name} className={`platform-card ${cls}`} onClick={()=>{setActive('downloader');document.getElementById('downloader').scrollIntoView({behavior:'smooth'});input.current?.focus()}}><span className="platform-icon">{symbol}</span><span className="platform-copy"><strong>{name}</strong><small>{description}</small><span className="supported"><Check size={14}/> Public links</span></span><ArrowRight className="card-arrow" size={19}/></button>)}</div></section>
-        <section className="section how" id="how"><div className="section-top"><span className="eyebrow">EFFORTLESS BY DESIGN</span><h2>Three steps. <em>One flow.</em></h2></div><div className="steps">{[['01','Paste your link','Copy a public video URL from a supported site and paste it above.'],['02','See the preview','SaveFlow checks the link and shows the thumbnail and available formats.'],['03','Choose and save','Pick a format or request the best available video and audio.']].map(([n,t,d])=><div className="step" key={n}><b>{n}</b><h3>{t}</h3><p>{d}</p></div>)}</div></section>
-        <section className="section faq" id="faq"><div className="section-top"><span className="eyebrow">GOOD TO KNOW</span><h2>Frequently asked <em>questions.</em></h2></div><div className="faq-list">{faqs.map(([q,a],i)=><div className="faq-item" key={q}><button aria-expanded={open===i} onClick={()=>setOpen(open===i?-1:i)}>{q}<span>{open===i?'−':'+'}</span></button>{open===i&&<p>{a}</p>}</div>)}</div></section>
-      </main><footer><a className="brand" href="#downloader"><span className="mark">S</span><span>SaveFlow</span></a><p>Your media. Your flow. © {new Date().getFullYear()} SaveFlow</p><small>Only download content you own or are authorized to save.</small></footer>
-    </div></div>
+  return <><section className="hero"><div className="eyebrow"><Sparkles size={14}/> YOUR MEDIA. YOUR FLOW.</div><h1>Download Social<br/><span>Videos Easily.</span></h1><p className="lead">Paste a public video link and save media you own or have permission to download.</p>
+    <form onSubmit={e=>{e.preventDefault();clearTimeout(timer.current);analyze(url)}} className="link-form"><Link2 size={21}/><input ref={input} type="url" value={url} onChange={e=>onChange(e.target.value)} placeholder="Paste video URL here..." aria-label="Video URL" required/>{url&&<button type="button" className="icon-clear" onClick={()=>onChange('')} aria-label="Clear link"><X size={18}/></button>}<span className="detect">{working?<><LoaderCircle size={16} className="spin"/> Analyzing</>:result?<><Check size={16}/> Ready</>:'PASTE A LINK'}</span></form>
+    <div className="hero-actions"><button className="button ghost" onClick={paste}><Clipboard size={18}/> Paste Link</button><button className="button primary" onClick={()=>result?download():analyze(url)} disabled={!url||working||downloading}>{working||downloading?<LoaderCircle size={18} className="spin"/>:<ArrowDownToLine size={18}/>} {result?(downloading?'Preparing file...':'Download Best Quality'):(working?'Analyzing...':'Analyze Link')}</button></div>
+    {progress&&<div role="status" className="download-progress"><div className="download-progress-label"><LoaderCircle size={16} className="spin"/> {progress.label}</div><progress max="100" value={progress.percent==null?undefined:progress.percent} aria-label="Download progress"/><small>{progress.percent==null?'Working…':`${progress.percent}% ${progress.phase==='save'?'saved':'of current stream'}`}</small></div>}
+    {error&&<div role="alert" className="error">{error}</div>}
+    {result&&<div className="result"><div className="preview">{result.thumbnail?<img src={result.thumbnail} alt={`Thumbnail for ${result.title}`} referrerPolicy="no-referrer"/>:<div className="no-image"><Play size={36}/></div>}<span className="play"><Play fill="currentColor" size={21}/></span></div><div className="result-info"><span className="pill ready"><Check size={14}/> VIDEO READY</span><h2>{result.title}</h2><p>{result.creator||'Public video'} · {result.platform||'Supported platform'}</p><label htmlFor="quality">Choose quality</label><select id="quality" value={selected} onChange={e=>setSelected(e.target.value)}><option value="best">{result.max_quality?'Best available up to 480p + audio':'Best available video + audio'}</option>{result.formats.map(f=><option key={f.id} value={f.id}>{formatLabel(f)}</option>)}</select><button className="button primary full" onClick={download} disabled={downloading}>{downloading?<LoaderCircle className="spin" size={18}/>:<ArrowDownToLine size={18}/>} {downloading?'Preparing download...':`Download ${chosen?.height?`${chosen.height}p`:result.max_quality?'up to 480p':'video'}`}</button><small>{result.max_quality?'YouTube is limited to 480p for reliable downloads.':'Best quality may require a few moments to combine video and audio.'}</small></div></div>}
+    {!result&&<div className="platform-pills">{platforms.slice(0,7).map(([name,,symbol,cls])=><span key={name}><b className={`mini ${cls}`}>{symbol}</b>{name}</span>)}</div>}
+    <div className="trust"><span><Sparkles size={16}/> Public links</span><i/><span><ShieldCheck size={16}/> Privacy focused</span><i/><span>∞ &nbsp; No extension</span></div>
+  </section><section className="section sites home-sites"><div className="section-top"><span className="eyebrow">ONE LINK. YOUR FAVORITE PLATFORMS.</span><h2>Made for the places<br/><em>you create.</em></h2><p>Explore public video sources Savyour can analyze.</p></div><PlatformCards/><div className="section-link"><a href={path('supported-sites/')}>See supported sites <ArrowRight size={17}/></a></div></section><section className="section how"><div className="section-top"><span className="eyebrow">SIMPLE FROM START TO FINISH</span><h2>Three steps. <em>One flow.</em></h2></div><div className="steps">{[['01','Paste your link','Copy a public video URL from a supported site.'],['02','See the preview','Review the thumbnail and available formats.'],['03','Choose and save','Track progress as your permitted media is saved.']].map(([n,t,d])=><div className="step" key={n}><b>{n}</b><h3>{t}</h3><p>{d}</p></div>)}</div><div className="section-link"><a href={path('how-it-works/')}>How it works <ArrowRight size={17}/></a></div></section></>;
 }
+function App(){return <div className="app"><div className="aurora aurora-a"/><div className="aurora aurora-b"/><div className="orb orb-a"/><div className="orb orb-b"/><div className="site-shell"><Header/><main>{page==='supported-sites'?<SupportedSites/>:page==='how-it-works'?<HowItWorks/>:page==='faq'?<FAQ/>:page==='about'?<About/>:<Downloader/>}</main><Footer/></div></div>;}
 createRoot(document.getElementById('root')).render(<App/>);

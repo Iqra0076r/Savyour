@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
-app = FastAPI(title='SaveFlow API')
+app = FastAPI(title='Savyour API')
 jobs = {}
 job_tasks = set()
 origins = [s.strip() for s in os.getenv('FRONTEND_ORIGINS', 'http://localhost:5173').split(',') if s.strip()]
