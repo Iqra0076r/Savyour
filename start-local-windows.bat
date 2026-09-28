@@ -31,13 +31,13 @@ if errorlevel 1 goto setup_failed
 
 set "STATIC_DIR=%CD%\frontend\dist"
 set "PORT=8000"
-set "ANALYZE_TIMEOUT=180"
-set "DOWNLOAD_TIMEOUT=1800"
-set "MAX_DOWNLOAD_BYTES=5000000000"
+if not defined ANALYZE_TIMEOUT set "ANALYZE_TIMEOUT=180"
+if not defined DOWNLOAD_TIMEOUT set "DOWNLOAD_TIMEOUT=1800"
+if not defined MAX_DOWNLOAD_BYTES set "MAX_DOWNLOAD_BYTES=5000000000"
 echo.
 echo Savyour will open at http://127.0.0.1:8000/
 echo Keep this window open while using it. Press Ctrl+C to stop.
-start "" powershell -NoProfile -Command "Start-Sleep -Seconds 3; Start-Process 'http://127.0.0.1:8000/'"
+if not "%SAVYOUR_PUBLIC%"=="1" start "" powershell -NoProfile -Command "Start-Sleep -Seconds 3; Start-Process 'http://127.0.0.1:8000/'"
 ".venv\Scripts\python.exe" -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 pause
 exit /b

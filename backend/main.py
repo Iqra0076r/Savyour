@@ -7,6 +7,7 @@ import socket
 import tempfile
 import time
 import uuid
+from collections import deque
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -22,6 +23,18 @@ from starlette.background import BackgroundTask
 app = FastAPI(title='Savyour API')
 jobs = {}
 job_tasks = set()
+request_windows = {'analyze': deque(), 'download': deque()}
+
+def throttle(kind, limit):
+    if os.getenv('SAVYOUR_PUBLIC') != '1':
+        return
+    window = request_windows[kind]
+    now = time.monotonic()
+    while window and now - window[0] > 300:
+        window.popleft()
+    if len(window) >= limit:
+        raise HTTPException(429, 'The home server is busy. Please try again in a few minutes.')
+    window.append(now)
 origins = [s.strip() for s in os.getenv('FRONTEND_ORIGINS', 'http://localhost:5173').split(',') if s.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=['GET', 'POST'], allow_headers=['Content-Type'], expose_headers=['Content-Disposition'])
 DOMAINS = ('youtube.com','youtu.be','tiktok.com','instagram.com','facebook.com','fb.watch','x.com','twitter.com','vimeo.com','pinterest.com','pin.it','reddit.com')
@@ -73,6 +86,7 @@ def health():
 
 @app.post('/api/analyze')
 async def analyze(link: Link):
+    throttle('analyze', int(os.getenv('ANALYZE_REQUESTS_PER_5_MIN', '30')))
     url = checked_url(link.url)
     try:
         info = await asyncio.wait_for(asyncio.to_thread(extract,url),int(os.getenv('ANALYZE_TIMEOUT','180')))
@@ -93,6 +107,7 @@ async def analyze(link: Link):
 
 @app.post('/api/download')
 async def download(link: Download):
+    throttle('download', int(os.getenv('DOWNLOAD_REQUESTS_PER_5_MIN', '8')))
     url = checked_url(link.url)
     fid = link.format_id
     if fid != 'best' and not re.fullmatch(r'[\w.+-]{1,80}',fid):
@@ -108,33 +123,51 @@ async def download(link: Download):
         raise HTTPException(422,f'Download unavailable: {str(e)[:220]}')
 
 def produce_file(url, fid, folder, progress=None):
+    max_bytes = int(os.getenv('MAX_DOWNLOAD_BYTES','1000000000'))
     def report(d, phase):
+        if phase == 'download' and (d.get('downloaded_bytes') or 0) > max_bytes:
+            raise ValueError('This video exceeds the server download size limit.')
         if progress:
             progress(d, phase)
     fmt = format_expression(url, fid)
-    with yt_dlp.YoutubeDL(options(skip_download=False, format=fmt, merge_output_format='mp4', outtmpl=str(folder/'%(title).120s-%(id)s.%(ext)s'), max_filesize=int(os.getenv('MAX_DOWNLOAD_BYTES','1000000000')), progress_hooks=[lambda d: report(d, 'download')], postprocessor_hooks=[lambda d: report(d, 'postprocess')])) as ydl:
+    with yt_dlp.YoutubeDL(options(skip_download=False, format=fmt, merge_output_format='mp4', outtmpl=str(folder/'%(title).120s-%(id)s.%(ext)s'), max_filesize=max_bytes, progress_hooks=[lambda d: report(d, 'download')], postprocessor_hooks=[lambda d: report(d, 'postprocess')])) as ydl:
         ydl.download([url])
     files = [p for p in folder.iterdir() if p.is_file() and not p.name.endswith('.part')]
     if not files:
         raise ValueError('No downloadable file was produced.')
-    return max(files,key=lambda p:p.stat().st_size)
+    file = max(files,key=lambda p:p.stat().st_size)
+    if file.stat().st_size > max_bytes:
+        raise ValueError('This video exceeds the server download size limit.')
+    return file
 
 def prune_jobs():
     now = time.monotonic()
     for key, job in list(jobs.items()):
-        if job['status'] in ('ready', 'error') and now - job['updated'] > 3600:
+        if job['status'] in ('ready', 'error') and now - job['updated'] > int(os.getenv('JOB_TTL_SECONDS', '3600')):
             shutil.rmtree(job['folder'], ignore_errors=True)
             jobs.pop(key, None)
 
+@app.on_event('startup')
+async def start_cleanup_loop():
+    async def cleanup_loop():
+        while True:
+            await asyncio.sleep(60)
+            prune_jobs()
+    task = asyncio.create_task(cleanup_loop())
+    job_tasks.add(task)
+    task.add_done_callback(job_tasks.discard)
+
 @app.post('/api/download/start')
 async def start_download(link: Download):
+    throttle('download', int(os.getenv('DOWNLOAD_REQUESTS_PER_5_MIN', '8')))
     url = checked_url(link.url)
     fid = link.format_id
     if fid != 'best' and not re.fullmatch(r'[\w.+-]{1,80}', fid):
         raise HTTPException(400, 'Invalid format selection.')
     prune_jobs()
-    if sum(j['status'] not in ('ready', 'error') for j in jobs.values()) >= 2:
-        raise HTTPException(429, 'Two downloads are already in progress. Try again shortly.')
+    limit = int(os.getenv('MAX_ACTIVE_JOBS', '2'))
+    if sum(j['status'] not in ('ready', 'error') for j in jobs.values()) >= limit:
+        raise HTTPException(429, 'The download queue is full. Try again shortly.')
     key = uuid.uuid4().hex
     folder = Path(tempfile.mkdtemp(prefix='saveflow-'))
     job = {'status':'starting', 'detail':'Connecting to source', 'percent':None, 'bytes':None, 'folder':folder, 'updated':time.monotonic(), 'completed_streams':set()}
@@ -177,7 +210,10 @@ def download_file(key: str):
     job = jobs.get(key)
     if not job or job['status'] != 'ready' or not job['file'].is_file():
         raise HTTPException(404, 'Download is not ready.')
-    return FileResponse(job['file'], filename=job['file'].name, media_type='application/octet-stream')
+    def cleanup():
+        jobs.pop(key, None)
+        shutil.rmtree(job['folder'], ignore_errors=True)
+    return FileResponse(job['file'], filename=job['file'].name, media_type='application/octet-stream', background=BackgroundTask(cleanup))
 
 static_dir = Path(os.getenv('STATIC_DIR', '/app/frontend/dist'))
 if static_dir.is_dir():
