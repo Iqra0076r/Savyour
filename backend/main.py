@@ -5,6 +5,8 @@ import re
 import shutil
 import socket
 import tempfile
+import time
+import uuid
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -18,6 +20,8 @@ from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
 app = FastAPI(title='SaveFlow API')
+jobs = {}
+job_tasks = set()
 origins = [s.strip() for s in os.getenv('FRONTEND_ORIGINS', 'http://localhost:5173').split(',') if s.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=['GET', 'POST'], allow_headers=['Content-Type'], expose_headers=['Content-Disposition'])
 DOMAINS = ('youtube.com','youtu.be','tiktok.com','instagram.com','facebook.com','fb.watch','x.com','twitter.com','vimeo.com','pinterest.com','pin.it','reddit.com')
@@ -42,7 +46,7 @@ def checked_url(raw):
     return url
 
 def options(**extra):
-    settings = dict(quiet=True, no_warnings=True, noplaylist=True, skip_download=True, socket_timeout=15, retries=1, extractor_retries=1, js_runtimes={'node': {}}, ffmpeg_location=imageio_ffmpeg.get_ffmpeg_exe())
+    settings = dict(quiet=True, no_warnings=True, noplaylist=True, skip_download=True, socket_timeout=15, retries=1, extractor_retries=1, fragment_retries=2, js_runtimes={'node': {}}, ffmpeg_location=imageio_ffmpeg.get_ffmpeg_exe())
     settings.update(extra)
     return settings
 
@@ -83,18 +87,83 @@ async def download(link: Download):
         raise HTTPException(400,'Invalid format selection.')
     folder = Path(tempfile.mkdtemp(prefix='saveflow-'))
     def produce():
-        with yt_dlp.YoutubeDL(options(skip_download=False, format=('bestvideo*+bestaudio/best' if fid == 'best' else f'{fid}+bestaudio/{fid}'), merge_output_format='mp4', outtmpl=str(folder/'%(title).120s-%(id)s.%(ext)s'), max_filesize=int(os.getenv('MAX_DOWNLOAD_BYTES','1000000000')))) as ydl:
-            ydl.download([url])
-        files = [p for p in folder.iterdir() if p.is_file() and not p.name.endswith('.part')]
-        if not files:
-            raise ValueError('No downloadable file was produced.')
-        return max(files,key=lambda p:p.stat().st_size)
+        return produce_file(url, fid, folder)
     try:
         file = await asyncio.wait_for(asyncio.to_thread(produce),int(os.getenv('DOWNLOAD_TIMEOUT','180')))
         return FileResponse(file, filename=file.name, media_type='application/octet-stream', background=BackgroundTask(lambda: shutil.rmtree(folder,ignore_errors=True)))
     except (asyncio.TimeoutError,yt_dlp.utils.DownloadError,ValueError) as e:
         shutil.rmtree(folder,ignore_errors=True)
         raise HTTPException(422,f'Download unavailable: {str(e)[:220]}')
+
+def produce_file(url, fid, folder, progress=None):
+    def report(d):
+        if progress:
+            progress(d)
+    fmt = 'bestvideo+bestaudio/best' if fid == 'best' else f'{fid}+bestaudio/{fid}'
+    with yt_dlp.YoutubeDL(options(skip_download=False, format=fmt, merge_output_format='mp4', outtmpl=str(folder/'%(title).120s-%(id)s.%(ext)s'), max_filesize=int(os.getenv('MAX_DOWNLOAD_BYTES','1000000000')), progress_hooks=[report], postprocessor_hooks=[report])) as ydl:
+        ydl.download([url])
+    files = [p for p in folder.iterdir() if p.is_file() and not p.name.endswith('.part')]
+    if not files:
+        raise ValueError('No downloadable file was produced.')
+    return max(files,key=lambda p:p.stat().st_size)
+
+def prune_jobs():
+    now = time.monotonic()
+    for key, job in list(jobs.items()):
+        if job['status'] in ('ready', 'error') and now - job['updated'] > 3600:
+            shutil.rmtree(job['folder'], ignore_errors=True)
+            jobs.pop(key, None)
+
+@app.post('/api/download/start')
+async def start_download(link: Download):
+    url = checked_url(link.url)
+    fid = link.format_id
+    if fid != 'best' and not re.fullmatch(r'[\w.+-]{1,80}', fid):
+        raise HTTPException(400, 'Invalid format selection.')
+    prune_jobs()
+    if sum(j['status'] not in ('ready', 'error') for j in jobs.values()) >= 2:
+        raise HTTPException(429, 'Two downloads are already in progress. Try again shortly.')
+    key = uuid.uuid4().hex
+    folder = Path(tempfile.mkdtemp(prefix='saveflow-'))
+    job = {'status':'starting', 'detail':'Connecting to source', 'percent':None, 'bytes':None, 'folder':folder, 'updated':time.monotonic()}
+    jobs[key] = job
+    def progress(d):
+        state = d.get('status')
+        if state == 'downloading':
+            received = d.get('downloaded_bytes') or 0
+            total = d.get('total_bytes') or d.get('total_bytes_estimate')
+            job.update(status='downloading', detail='Receiving video and audio', bytes=received, percent=round(100*received/total, 1) if total else None)
+        elif state == 'finished':
+            job.update(status='processing', detail='Combining video and audio', percent=None)
+        elif state == 'started':
+            job.update(status='processing', detail='Combining video and audio', percent=None)
+    async def run():
+        try:
+            file = await asyncio.to_thread(produce_file, url, fid, folder, progress)
+            job.update(status='ready', detail='Ready to save', file=file, percent=100)
+        except Exception as exc:
+            job.update(status='error', detail=f'Download unavailable: {str(exc)[:400]}')
+            shutil.rmtree(folder, ignore_errors=True)
+        finally:
+            job['updated'] = time.monotonic()
+    task = asyncio.create_task(run())
+    job_tasks.add(task)
+    task.add_done_callback(job_tasks.discard)
+    return {'id':key}
+
+@app.get('/api/download/{key}')
+def download_status(key: str):
+    job = jobs.get(key)
+    if not job:
+        raise HTTPException(404, 'Download job expired or not found.')
+    return {k:job.get(k) for k in ('status','detail','percent','bytes')}
+
+@app.get('/api/download/{key}/file')
+def download_file(key: str):
+    job = jobs.get(key)
+    if not job or job['status'] != 'ready' or not job['file'].is_file():
+        raise HTTPException(404, 'Download is not ready.')
+    return FileResponse(job['file'], filename=job['file'].name, media_type='application/octet-stream')
 
 static_dir = Path(os.getenv('STATIC_DIR', '/app/frontend/dist'))
 if static_dir.is_dir():
