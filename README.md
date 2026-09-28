@@ -4,7 +4,16 @@ React frontend and FastAPI/yt-dlp backend for analyzing public social video link
 
 ## Local development
 
-Install `ffmpeg` on the backend machine. In `backend`, run `pip install -r requirements.txt` and `uvicorn main:app --reload`. In `frontend`, run `npm ci` and `npm run dev`. The frontend defaults to `http://localhost:8000` for the API.
+### Windows one-click test
+
+1. Install [Python 3](https://www.python.org/downloads/windows/), [Node.js 22 or newer](https://nodejs.org/en/download), and [FFmpeg](https://ffmpeg.org/download.html). Make sure all three are on `PATH`; reopen the terminal after installation. FFmpeg merges the best video and audio streams.
+2. Download this repository as a ZIP using **Code → Download ZIP** on GitHub and extract it, or clone it.
+3. Double-click `start-local-windows.bat`. The first run installs dependencies and builds the React frontend. Leave the command window open.
+4. Open <http://127.0.0.1:8000/> on that same PC. Paste a public video link; the site fetches its thumbnail and qualities, then downloads the selected video to your browser's chosen location. Test the sample link <https://youtu.be/1gviYs7eF0c?si=hiW4O5dKcVO8LR4O> here.
+
+The launcher binds only to `127.0.0.1`; it does not expose your PC to the internet. It allows up to 5 GB and 30 minutes per download for this local test. Success depends on the platform allowing playback from your connection and on the video being available. Some sites require authentication or block automated requests; a local run cannot guarantee every link.
+
+For development with hot reload, install `ffmpeg`, run `pip install -r backend/requirements.txt` and `uvicorn backend.main:app --reload` from the repository root, and run `npm ci && npm run dev` in `frontend`. The Vite frontend proxies `/api` to `http://localhost:8000`.
 
 ## Deployment
 
@@ -16,4 +25,4 @@ The GitHub Actions workflow deploys `frontend` to GitHub Pages from `main`. Its 
 
 For the free backend option, [deploy the Render Blueprint](https://render.com/deploy?repo=https://github.com/Iqra0076r/Savyour) from this repository. The root `render.yaml` configures a Docker web service and its CORS origin. The frontend is preconfigured for `https://saveflow-savyour-api.onrender.com`. If Render assigns a different URL, set the GitHub Actions repository variable `VITE_API_URL` to the actual HTTPS service URL, then rerun the Pages workflow. The health check is `/api/health`. Render free web services spin down after inactivity; the first request after idle can be slow, and video transfers may exceed free tier time, memory or bandwidth limits.
 
-The server accepts only HTTPS links on an allowlist of public platform hosts and does not handle logins or cookies. Private or restricted videos may fail. `yt-dlp` and ffmpeg should be kept updated. A production public service needs rate limits, download size and disk quotas, concurrency controls, and abuse monitoring before significant traffic. This starter limits yt-dlp files to 1 GB and individual jobs to 180 seconds, but hosting limits can be lower.
+The server accepts only HTTPS links on an allowlist of public platform hosts and does not handle logins or cookies. Private or restricted videos may fail. `yt-dlp` and ffmpeg should be kept updated. A production public service needs rate limits, download size and disk quotas, concurrency controls, and abuse monitoring before significant traffic. Hosted defaults limit yt-dlp files to 1 GB and downloads to 180 seconds; the local launcher overrides these defaults, but disk space and platform restrictions still apply.

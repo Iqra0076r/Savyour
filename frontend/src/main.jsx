@@ -37,12 +37,16 @@ function App(){
   }
   async function paste(){try{onChange(await navigator.clipboard.readText());input.current?.focus();}catch{setError('Clipboard access unavailable. Paste the link into the field.');}}
   async function download(){if(!url || downloading) return; setDownloading(true);setError('');
-    try{const response=await fetch(`${API}/api/download`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,format_id:selected})});
+    try{
+      // Save large files straight to disk on supported desktop browsers.
+      const handle=window.showSaveFilePicker ? await window.showSaveFilePicker({suggestedName:`${(result?.title||'saveflow-video').replace(/[\\/:*?"<>|]/g,'').slice(0,90)}.mp4`,types:[{description:'Video',accept:{'video/mp4':['.mp4'],'video/webm':['.webm']}}]}) : null;
+      const response=await fetch(`${API}/api/download`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,format_id:selected})});
       if(!response.ok){const data=await response.json();throw Error(data.detail || 'Download failed.');}
+      if(handle){const writer=await handle.createWritable();try{const reader=response.body.getReader();while(true){const {done,value}=await reader.read();if(done) break;await writer.write(value)}await writer.close()}catch(e){await writer.abort();throw e}return;}
       const blob=await response.blob(); const object=URL.createObjectURL(blob);const a=document.createElement('a');a.href=object;
       const disposition=response.headers.get('content-disposition')||'';const match=disposition.match(/filename\*=UTF-8''([^;]+)/i);
       a.download=match?decodeURIComponent(match[1]):'saveflow-video.mp4';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(object),60000);
-    }catch(e){setError(e instanceof TypeError ? 'The download server is unavailable. Please try again shortly.' : (e.message || 'Download failed.'));}finally{setDownloading(false);}
+    }catch(e){if(e.name!=='AbortError') setError(e instanceof TypeError ? 'The download server is unavailable. Please try again shortly.' : (e.message || 'Download failed.'));}finally{setDownloading(false);}
   }
   useEffect(()=>()=>clearTimeout(timer.current),[]);
   const chosen=result?.formats.find(f=>f.id===selected);

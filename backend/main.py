@@ -41,7 +41,7 @@ def checked_url(raw):
     return url
 
 def options(**extra):
-    settings = dict(quiet=True, no_warnings=True, noplaylist=True, skip_download=True, socket_timeout=15, retries=1, extractor_retries=1)
+    settings = dict(quiet=True, no_warnings=True, noplaylist=True, skip_download=True, socket_timeout=15, retries=1, extractor_retries=1, js_runtimes={'node': {}})
     settings.update(extra)
     return settings
 
@@ -60,7 +60,7 @@ def health():
 async def analyze(link: Link):
     url = checked_url(link.url)
     try:
-        info = await asyncio.wait_for(asyncio.to_thread(extract,url),180)
+        info = await asyncio.wait_for(asyncio.to_thread(extract,url),int(os.getenv('ANALYZE_TIMEOUT','180')))
         formats = []
         seen = set()
         for f in info.get('formats') or []:
@@ -82,14 +82,14 @@ async def download(link: Download):
         raise HTTPException(400,'Invalid format selection.')
     folder = Path(tempfile.mkdtemp(prefix='saveflow-'))
     def produce():
-        with yt_dlp.YoutubeDL(options(skip_download=False, format=('bestvideo*+bestaudio/best' if fid == 'best' else f'{fid}+bestaudio/{fid}'), merge_output_format='mp4', outtmpl=str(folder/'%(title).120s-%(id)s.%(ext)s'), max_filesize=1_000_000_000)) as ydl:
+        with yt_dlp.YoutubeDL(options(skip_download=False, format=('bestvideo*+bestaudio/best' if fid == 'best' else f'{fid}+bestaudio/{fid}'), merge_output_format='mp4', outtmpl=str(folder/'%(title).120s-%(id)s.%(ext)s'), max_filesize=int(os.getenv('MAX_DOWNLOAD_BYTES','1000000000')))) as ydl:
             ydl.download([url])
         files = [p for p in folder.iterdir() if p.is_file() and not p.name.endswith('.part')]
         if not files:
             raise ValueError('No downloadable file was produced.')
         return max(files,key=lambda p:p.stat().st_size)
     try:
-        file = await asyncio.wait_for(asyncio.to_thread(produce),180)
+        file = await asyncio.wait_for(asyncio.to_thread(produce),int(os.getenv('DOWNLOAD_TIMEOUT','180')))
         return FileResponse(file, filename=file.name, media_type='application/octet-stream', background=BackgroundTask(lambda: shutil.rmtree(folder,ignore_errors=True)))
     except (asyncio.TimeoutError,yt_dlp.utils.DownloadError,ValueError) as e:
         shutil.rmtree(folder,ignore_errors=True)
