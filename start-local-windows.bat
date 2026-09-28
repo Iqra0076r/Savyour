@@ -26,12 +26,8 @@ call npm run build
 if errorlevel 1 goto setup_failed_pop
 popd
 
-where ffmpeg >nul 2>&1
-if errorlevel 1 (
-    echo.
-    echo WARNING: FFmpeg is not installed. High-quality video and audio merging may fail.
-    echo Install FFmpeg and restart this launcher for best quality.
-)
+".venv\Scripts\python.exe" -c "import imageio_ffmpeg,subprocess; p=imageio_ffmpeg.get_ffmpeg_exe(); subprocess.run([p,'-version'],check=True,stdout=subprocess.DEVNULL); print('FFmpeg ready:',p)"
+if errorlevel 1 goto setup_failed
 
 set "STATIC_DIR=%CD%\frontend\dist"
 set "PORT=8000"

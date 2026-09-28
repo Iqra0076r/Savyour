@@ -6,14 +6,14 @@ React frontend and FastAPI/yt-dlp backend for analyzing public social video link
 
 ### Windows one-click test
 
-1. Install [Python 3](https://www.python.org/downloads/windows/), [Node.js 22 or newer](https://nodejs.org/en/download), and [FFmpeg](https://ffmpeg.org/download.html). Make sure all three are on `PATH`; reopen the terminal after installation. FFmpeg merges the best video and audio streams.
+1. Install [Python 3](https://www.python.org/downloads/windows/) and [Node.js 22 or newer](https://nodejs.org/en/download). Make sure both are on `PATH`; reopen the terminal after installation. The launcher installs a bundled FFmpeg binary to merge the best video and audio streams.
 2. Download this repository as a ZIP using **Code → Download ZIP** on GitHub and extract it, or clone it.
 3. Double-click `start-local-windows.bat`. The first run installs dependencies and builds the React frontend. Leave the command window open.
 4. Open <http://127.0.0.1:8000/> on that same PC. Paste a public video link; the site fetches its thumbnail and qualities, then downloads the selected video to your browser's chosen location. Test the sample link <https://youtu.be/1gviYs7eF0c?si=hiW4O5dKcVO8LR4O> here.
 
 The launcher binds only to `127.0.0.1`; it does not expose your PC to the internet. It allows up to 5 GB and 30 minutes per download for this local test. Success depends on the platform allowing playback from your connection and on the video being available. Some sites require authentication or block automated requests; a local run cannot guarantee every link.
 
-For development with hot reload, install `ffmpeg`, run `pip install -r backend/requirements.txt` and `uvicorn backend.main:app --reload` from the repository root, and run `npm ci && npm run dev` in `frontend`. The Vite frontend proxies `/api` to `http://localhost:8000`.
+For development with hot reload, run `pip install -r backend/requirements.txt` and `uvicorn backend.main:app --reload` from the repository root, and run `npm ci && npm run dev` in `frontend`. The Vite frontend proxies `/api` to `http://localhost:8000`.
 
 ## Deployment
 

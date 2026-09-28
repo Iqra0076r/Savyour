@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import yt_dlp
+import imageio_ffmpeg
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -41,7 +42,7 @@ def checked_url(raw):
     return url
 
 def options(**extra):
-    settings = dict(quiet=True, no_warnings=True, noplaylist=True, skip_download=True, socket_timeout=15, retries=1, extractor_retries=1, js_runtimes={'node': {}})
+    settings = dict(quiet=True, no_warnings=True, noplaylist=True, skip_download=True, socket_timeout=15, retries=1, extractor_retries=1, js_runtimes={'node': {}}, ffmpeg_location=imageio_ffmpeg.get_ffmpeg_exe())
     settings.update(extra)
     return settings
 
