@@ -11,7 +11,7 @@ React frontend and FastAPI/yt-dlp backend for analyzing public social video link
 3. Double-click `start-local-windows.bat`. The first run installs dependencies and builds the React frontend. Leave the command window open.
 4. Open <http://127.0.0.1:8000/> on that same PC. Paste a public video link; the site fetches its thumbnail and qualities, then downloads the selected video to your browser's chosen location. Test the sample link <https://youtu.be/1gviYs7eF0c?si=hiW4O5dKcVO8LR4O> here.
 
-The download view reports connection, video/audio transfer, merging, and saving progress. If a YouTube download remains on **Connecting to source**, send the exact status and the final lines of the command window. YouTube may allow metadata while refusing media streams, so a thumbnail alone does not prove that its streams can be saved.
+The download view reports connection, live progress for each media stream, merging, and saving. YouTube quality is capped at 480p in both the menu and backend; other platforms retain their best available quality. If a YouTube download remains on **Connecting to source**, send the exact status and the final lines of the command window. YouTube may allow metadata while refusing media streams, so a thumbnail alone does not prove that its streams can be saved.
 
 The launcher binds only to `127.0.0.1`; it does not expose your PC to the internet. It allows up to 5 GB and 30 minutes per download for this local test. Success depends on the platform allowing playback from your connection and on the video being available. Some sites require authentication or block automated requests; a local run cannot guarantee every link.
 

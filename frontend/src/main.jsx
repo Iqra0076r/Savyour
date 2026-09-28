@@ -19,7 +19,7 @@ const faqs = [
 function App(){
   const [url,setUrl]=useState(''), [result,setResult]=useState(null), [selected,setSelected]=useState('best');
   const [working,setWorking]=useState(false), [downloading,setDownloading]=useState(false), [error,setError]=useState('');
-  const [progress,setProgress]=useState('');
+  const [progress,setProgress]=useState(null);
   const [light,setLight]=useState(false), [open,setOpen]=useState(-1), [active,setActive]=useState('downloader');
   const timer=useRef(null), current=useRef(0), input=useRef(null);
   async function analyze(value){
@@ -37,7 +37,7 @@ function App(){
     if(/^https:\/\/\S+\.[^\s]+/.test(v.trim())) timer.current=setTimeout(()=>analyze(v),650);
   }
   async function paste(){try{onChange(await navigator.clipboard.readText());input.current?.focus();}catch{setError('Clipboard access unavailable. Paste the link into the field.');}}
-  async function download(){if(!url || downloading) return; setDownloading(true);setError('');setProgress('Connecting to source…');
+  async function download(){if(!url || downloading) return; setDownloading(true);setError('');setProgress({label:'Connecting to source…',percent:null});
     try{
       // Save large files straight to disk on supported desktop browsers.
       const handle=window.showSaveFilePicker ? await window.showSaveFilePicker({suggestedName:`${(result?.title||'saveflow-video').replace(/[\\/:*?"<>|]/g,'').slice(0,90)}.mp4`,types:[{description:'Video',accept:{'video/mp4':['.mp4'],'video/webm':['.webm']}}]}) : null;
@@ -52,16 +52,20 @@ function App(){
         if(state.status==='error') throw Error(state.detail);
         if(state.status==='ready') break;
         const amount=state.percent!=null ? ` ${state.percent}%` : state.bytes ? ` ${(state.bytes/1048576).toFixed(1)} MB` : '';
-        setProgress(`${state.detail || 'Downloading'}${amount}`);
+        setProgress({label:`${state.detail || 'Downloading'}${amount}`,percent:state.percent});
       }
-      setProgress('Saving to your computer…');
+      setProgress({label:'Saving to your computer…',percent:null});
       const response=await fetch(`${API}/api/download/${startData.id}/file`);
       if(!response.ok){const data=await response.json();throw Error(data.detail || 'Download failed.');}
-      if(handle){const writer=await handle.createWritable();try{const reader=response.body.getReader();while(true){const {done,value}=await reader.read();if(done) break;await writer.write(value)}await writer.close()}catch(e){await writer.abort();throw e}return;}
-      const blob=await response.blob(); const object=URL.createObjectURL(blob);const a=document.createElement('a');a.href=object;
+      const total=Number(response.headers.get('content-length')) || null;
+      let received=0;
+      function showSaving(bytes){received+=bytes;setProgress({label:`Saving to your computer · ${(received/1048576).toFixed(1)} MB`,percent:total?Math.round(100*received/total):null,phase:'save'});}
+      if(handle){const writer=await handle.createWritable();try{const reader=response.body.getReader();while(true){const {done,value}=await reader.read();if(done) break;await writer.write(value);showSaving(value.length)}await writer.close()}catch(e){await writer.abort();throw e}return;}
+      const chunks=[];const reader=response.body.getReader();while(true){const {done,value}=await reader.read();if(done) break;chunks.push(value);showSaving(value.length)}
+      const blob=new Blob(chunks,{type:response.headers.get('content-type')||'application/octet-stream'}); const object=URL.createObjectURL(blob);const a=document.createElement('a');a.href=object;
       const disposition=response.headers.get('content-disposition')||'';const match=disposition.match(/filename\*=UTF-8''([^;]+)/i);
       a.download=match?decodeURIComponent(match[1]):'saveflow-video.mp4';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(object),60000);
-    }catch(e){if(e.name!=='AbortError') setError(e instanceof TypeError ? 'The download server is unavailable. Please try again shortly.' : (e.message || 'Download failed.'));}finally{setDownloading(false);setProgress('');}
+    }catch(e){if(e.name!=='AbortError') setError(e instanceof TypeError ? 'The download server is unavailable. Please try again shortly.' : (e.message || 'Download failed.'));}finally{setDownloading(false);setProgress(null);}
   }
   useEffect(()=>()=>clearTimeout(timer.current),[]);
   const chosen=result?.formats.find(f=>f.id===selected);
@@ -83,9 +87,9 @@ function App(){
             <span className="detect">{working?<><LoaderCircle size={16} className="spin"/> Analyzing</>:result?<><Check size={16}/> Ready</>:'PASTE A LINK'}</span>
           </form>
           <div className="hero-actions"><button className="button ghost" onClick={paste}><Clipboard size={18}/> Paste Link</button><button className="button primary" onClick={()=>result?download():analyze(url)} disabled={!url||working||downloading}>{working||downloading?<LoaderCircle size={18} className="spin"/>:<ArrowDownToLine size={18}/>} {result?(downloading?'Preparing file...':'Download Best Quality'):(working?'Analyzing...':'Analyze Link')}</button></div>
-          {progress&&<div role="status" className="download-progress"><LoaderCircle size={16} className="spin"/> {progress}</div>}
+          {progress&&<div role="status" className="download-progress"><div className="download-progress-label"><LoaderCircle size={16} className="spin"/> {progress.label}</div><progress max="100" value={progress.percent==null?undefined:progress.percent} aria-label="Download progress"/><small>{progress.percent==null?'Working…':`${progress.percent}% ${progress.phase==='save'?'saved':'of current stream'}`}</small></div>}
           {error&&<div role="alert" className="error">{error}</div>}
-          {result&&<div className="result"><div className="preview">{result.thumbnail?<img src={result.thumbnail} alt="Video thumbnail" referrerPolicy="no-referrer"/>:<div className="no-image"><Play size={36}/></div>}<span className="play"><Play fill="currentColor" size={21}/></span></div><div className="result-info"><span className="pill ready"><Check size={14}/> VIDEO READY</span><h2>{result.title}</h2><p>{result.creator||'Public video'} · {result.platform||'Supported platform'}</p><label htmlFor="quality">Choose quality</label><select id="quality" value={selected} onChange={e=>setSelected(e.target.value)}><option value="best">Best available video + audio</option>{result.formats.map(f=><option key={f.id} value={f.id}>{formatLabel(f)}</option>)}</select><button className="button primary full" onClick={download} disabled={downloading}>{downloading?<LoaderCircle className="spin" size={18}/>:<ArrowDownToLine size={18}/>} {downloading?'Preparing download...':`Download ${chosen?.height?`${chosen.height}p`:'video'}`}</button><small>Best quality may require a few moments to combine video and audio.</small></div></div>}
+          {result&&<div className="result"><div className="preview">{result.thumbnail?<img src={result.thumbnail} alt="Video thumbnail" referrerPolicy="no-referrer"/>:<div className="no-image"><Play size={36}/></div>}<span className="play"><Play fill="currentColor" size={21}/></span></div><div className="result-info"><span className="pill ready"><Check size={14}/> VIDEO READY</span><h2>{result.title}</h2><p>{result.creator||'Public video'} · {result.platform||'Supported platform'}</p><label htmlFor="quality">Choose quality</label><select id="quality" value={selected} onChange={e=>setSelected(e.target.value)}><option value="best">{result.max_quality?'Best available up to 480p + audio':'Best available video + audio'}</option>{result.formats.map(f=><option key={f.id} value={f.id}>{formatLabel(f)}</option>)}</select><button className="button primary full" onClick={download} disabled={downloading}>{downloading?<LoaderCircle className="spin" size={18}/>:<ArrowDownToLine size={18}/>} {downloading?'Preparing download...':`Download ${chosen?.height?`${chosen.height}p`:result.max_quality?'up to 480p':'video'}`}</button><small>{result.max_quality?'YouTube is limited to 480p for reliable downloads.':'Best quality may require a few moments to combine video and audio.'}</small></div></div>}
           {!result&&<div className="platform-pills">{platforms.map(([name,,symbol,cls])=><span key={name}><b className={`mini ${cls}`}>{symbol}</b>{name}</span>)}</div>}
           <div className="trust"><span><Sparkles size={16}/> Easy to use</span><i/> <span><ShieldCheck size={16}/> Privacy focused</span><i/> <span>∞ &nbsp; No software</span></div>
         </section>

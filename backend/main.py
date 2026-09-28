@@ -45,6 +45,16 @@ def checked_url(raw):
         raise HTTPException(400, 'The link host is unavailable.')
     return url
 
+def is_youtube_url(url):
+    host = (urlparse(url).hostname or '').lower().rstrip('.')
+    return host in ('youtu.be', 'youtube.com') or host.endswith('.youtube.com')
+
+def format_expression(url, fid):
+    if is_youtube_url(url):
+        return ('bestvideo[height<=480]+bestaudio/best[height<=480]' if fid == 'best'
+                else f'{fid}[height<=480][acodec=none]+bestaudio/{fid}[height<=480]')
+    return 'bestvideo+bestaudio/best' if fid == 'best' else f'{fid}[acodec=none]+bestaudio/{fid}'
+
 def options(**extra):
     settings = dict(quiet=True, no_warnings=True, noplaylist=True, skip_download=True, socket_timeout=15, retries=1, extractor_retries=1, fragment_retries=2, js_runtimes={'node': {}}, ffmpeg_location=imageio_ffmpeg.get_ffmpeg_exe())
     settings.update(extra)
@@ -72,10 +82,12 @@ async def analyze(link: Link):
             fid = str(f.get('format_id') or '')
             if not fid or fid in seen or f.get('vcodec') == 'none' or not f.get('url'):
                 continue
+            if is_youtube_url(url) and (not isinstance(f.get('height'), (int, float)) or f['height'] > 480):
+                continue
             seen.add(fid)
             formats.append(dict(id=fid, height=f.get('height'), ext=f.get('ext') or 'video', size=f.get('filesize') or f.get('filesize_approx'), has_audio=f.get('acodec') != 'none', fps=f.get('fps')))
         formats.sort(key=lambda f:(f['height'] or 0,f['has_audio'],f['fps'] or 0),reverse=True)
-        return dict(title=info.get('title') or 'Untitled video', thumbnail=info.get('thumbnail'), duration=info.get('duration'), creator=info.get('uploader'), platform=info.get('extractor_key') or info.get('extractor'), formats=formats[:40])
+        return dict(title=info.get('title') or 'Untitled video', thumbnail=info.get('thumbnail'), duration=info.get('duration'), creator=info.get('uploader'), platform=info.get('extractor_key') or info.get('extractor'), formats=formats[:40], max_quality=480 if is_youtube_url(url) else None)
     except (asyncio.TimeoutError, yt_dlp.utils.DownloadError, ValueError) as e:
         raise HTTPException(422, f'Could not analyze this public video: {str(e)[:220]}')
 
@@ -96,11 +108,11 @@ async def download(link: Download):
         raise HTTPException(422,f'Download unavailable: {str(e)[:220]}')
 
 def produce_file(url, fid, folder, progress=None):
-    def report(d):
+    def report(d, phase):
         if progress:
-            progress(d)
-    fmt = 'bestvideo+bestaudio/best' if fid == 'best' else f'{fid}+bestaudio/{fid}'
-    with yt_dlp.YoutubeDL(options(skip_download=False, format=fmt, merge_output_format='mp4', outtmpl=str(folder/'%(title).120s-%(id)s.%(ext)s'), max_filesize=int(os.getenv('MAX_DOWNLOAD_BYTES','1000000000')), progress_hooks=[report], postprocessor_hooks=[report])) as ydl:
+            progress(d, phase)
+    fmt = format_expression(url, fid)
+    with yt_dlp.YoutubeDL(options(skip_download=False, format=fmt, merge_output_format='mp4', outtmpl=str(folder/'%(title).120s-%(id)s.%(ext)s'), max_filesize=int(os.getenv('MAX_DOWNLOAD_BYTES','1000000000')), progress_hooks=[lambda d: report(d, 'download')], postprocessor_hooks=[lambda d: report(d, 'postprocess')])) as ydl:
         ydl.download([url])
     files = [p for p in folder.iterdir() if p.is_file() and not p.name.endswith('.part')]
     if not files:
@@ -125,18 +137,20 @@ async def start_download(link: Download):
         raise HTTPException(429, 'Two downloads are already in progress. Try again shortly.')
     key = uuid.uuid4().hex
     folder = Path(tempfile.mkdtemp(prefix='saveflow-'))
-    job = {'status':'starting', 'detail':'Connecting to source', 'percent':None, 'bytes':None, 'folder':folder, 'updated':time.monotonic()}
+    job = {'status':'starting', 'detail':'Connecting to source', 'percent':None, 'bytes':None, 'folder':folder, 'updated':time.monotonic(), 'completed_streams':set()}
     jobs[key] = job
-    def progress(d):
+    def progress(d, phase):
         state = d.get('status')
-        if state == 'downloading':
+        if phase == 'postprocess':
+            job.update(status='processing', detail='Combining video and audio', percent=None)
+        elif state == 'downloading':
             received = d.get('downloaded_bytes') or 0
             total = d.get('total_bytes') or d.get('total_bytes_estimate')
-            job.update(status='downloading', detail='Receiving video and audio', bytes=received, percent=round(100*received/total, 1) if total else None)
+            stream = len(job['completed_streams']) + 1
+            job.update(status='downloading', detail=f'Downloading media stream {stream}', bytes=received, percent=round(min(100, 100*received/total), 1) if total else None)
         elif state == 'finished':
-            job.update(status='processing', detail='Combining video and audio', percent=None)
-        elif state == 'started':
-            job.update(status='processing', detail='Combining video and audio', percent=None)
+            job['completed_streams'].add(d.get('filename') or len(job['completed_streams']))
+            job.update(status='processing', detail='Preparing next stream or combining files', percent=None)
     async def run():
         try:
             file = await asyncio.to_thread(produce_file, url, fid, folder, progress)
