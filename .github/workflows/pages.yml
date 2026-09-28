@@ -29,6 +29,8 @@ jobs:
         env:
           GITHUB_PAGES_BASE: /Savyour/
           VITE_API_URL: ${{ vars.VITE_API_URL || 'https://savyour.blitz.cloud' }}
+          VITE_SITE_URL: ${{ vars.VITE_SITE_URL || 'https://savyour.blitz.cloud' }}
+          GOOGLE_SITE_VERIFICATION: ${{ vars.GOOGLE_SITE_VERIFICATION }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: frontend/dist

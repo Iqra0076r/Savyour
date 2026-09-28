@@ -1,4 +1,7 @@
 FROM node:22-slim AS frontend
+ARG VITE_SITE_URL=https://savyour.blitz.cloud
+ARG GOOGLE_SITE_VERIFICATION
+ENV VITE_SITE_URL=${VITE_SITE_URL} GOOGLE_SITE_VERIFICATION=${GOOGLE_SITE_VERIFICATION}
 WORKDIR /build
 COPY frontend/package.json ./
 RUN npm install

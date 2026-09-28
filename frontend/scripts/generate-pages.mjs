@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { platformGuides, guides } from '../src/seo-content.js';
 
 const root = resolve(import.meta.dirname, '..');
 const site = (process.env.VITE_SITE_URL || 'https://savyour.blitz.cloud').replace(/\/$/, '');
@@ -22,6 +23,7 @@ const platformPages = [
   ['reddit','Reddit','public video posts','best available','Reddit video post','reddit.com video post'],
 ];
 for(const [slug,name,types,quality,item,example] of platformPages) pages.push({path:`platforms/${slug}/`,title:`${name} Video Downloader | Public ${name} Videos — Savyour`,description:`Save ${types} you own or are authorized to download. Paste a ${name} link, preview its thumbnail, and choose ${quality} quality on Savyour.`,heading:`Download ${name} videos`,body:`Copy the link to an individual ${item}, paste it into Savyour, review the thumbnail and available formats, then save your permitted video. Example link: ${example}. ${name} availability depends on the source. ${slug==='youtube'?'YouTube video quality is limited to 480p.':'Choose the best available quality when offered.'}`});
+for(const guide of guides) pages.push({path:`guides/${guide.slug}/`,title:`${guide.title} | Savyour Guide`,description:guide.description,heading:guide.title,body:guide.lead});
 const esc = s => s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const json = obj => JSON.stringify(obj).replaceAll('<','\\u003c');
 const extra = {
@@ -30,25 +32,27 @@ const extra = {
   'faq/': '<h2>Answers</h2><h3>Which sites are supported?</h3><p>YouTube, TikTok, Instagram, Facebook, X, Vimeo, Pinterest, and Reddit public links.</p><h3>Why is YouTube limited to 480p?</h3><p>Higher formats have not downloaded reliably in this setup, so the backend caps YouTube at 480p.</p><h3>Why might a thumbnail show while a download fails?</h3><p>The source may allow metadata but restrict the media stream, or require login.</p><h3>Can I choose quality?</h3><p>Yes, choose a listed format or Best available.</p>',
   'about/': '<h2>What Savyour does</h2><p>Savyour analyzes public video links, displays available formats, and saves media when the source permits access.</p><h2>Responsible use</h2><p>Respect creators and platform rules. Only save content you own or are authorized to download.</p>',
 };
-for(const [slug,name,types,quality,item,example] of platformPages) extra[`platforms/${slug}/`]=`<h2>How to save a ${name} video</h2><ol><li>Copy the link to an individual public ${esc(item)}.</li><li>Paste the ${esc(example)} link into the ${esc(name)} downloader and check the preview.</li><li>Select ${esc(quality)} quality and save permitted media.</li></ol><h2>Supported ${esc(name)} links</h2><p>Individual ${esc(types)} may work when their media streams are publicly available. Private and login-restricted posts may fail. A thumbnail alone does not guarantee a downloadable file.</p><h2>Permissions</h2><p>Only download media you own or have permission to save.</p>`;
+for(const [slug,name,types,quality,item,example] of platformPages) extra[`platforms/${slug}/`]=`<h2>How to save a ${name} video</h2><p>${esc(platformGuides[slug].copy)}</p><h2>Common issue</h2><p>${esc(platformGuides[slug].problem)}</p><p><a href="${base}guides/thumbnail-but-download-fails/">Why can a thumbnail load while a download fails?</a></p>`;
+for(const guide of guides) extra[`guides/${guide.slug}/`]=guide.sections.map(([heading,body])=>`<h2>${esc(heading)}</h2><p>${esc(body)}</p>`).join('');
 for (const page of pages) {
   const canonical = `${site}/${page.path}`;
-  const links = pages.map(p => `<a href="${base}${p.path}">${esc(p.path ? p.heading : 'Home')}</a>`).join(' · ');
+  const links = pages.filter(p=>!p.path.startsWith('guides/')).map(p => `<a href="${base}${p.path}">${esc(p.path ? p.heading : 'Home')}</a>`).join(' · ');
   const schema = [{ '@context':'https://schema.org', '@type':'WebPage', name:page.title, description:page.description, url:canonical, isPartOf:{'@type':'WebSite',name:'Savyour',url:`${site}/`} }];
   if (!page.path) schema.push({'@context':'https://schema.org','@type':'SoftwareApplication',name:'Savyour',applicationCategory:'MultimediaApplication',operatingSystem:'Web',url:canonical,description:page.description,offers:{'@type':'Offer',price:'0',priceCurrency:'USD'}});
   else schema.push({'@context':'https://schema.org','@type':'BreadcrumbList',itemListElement:[{'@type':'ListItem',position:1,name:'Home',item:`${site}/`},{'@type':'ListItem',position:2,name:page.heading,item:canonical}]});
   const html = `<!doctype html>
 <html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>html{background:#0a0613;color:#fff}html.js #root{visibility:hidden}html.js.app-ready #root{visibility:visible}#boot{display:none}html.js:not(.app-ready) #boot{display:grid;place-items:center;position:fixed;inset:0;background:radial-gradient(circle at 50% 35%,#3c1859,#0a0613 62%);color:#e9d9f5;font:16px system-ui;z-index:2}#boot div{text-align:center}#boot img{width:184px;max-width:60vw;display:block;margin:0 auto 18px}</style><script>document.documentElement.classList.add('js');setTimeout(()=>document.documentElement.classList.add('app-ready'),8000)</script>
 <meta name="theme-color" content="#0a0613"><meta name="color-scheme" content="dark">
 <title>${esc(page.title)}</title><meta name="description" content="${esc(page.description)}">
 <meta name="robots" content="index,follow,max-image-preview:large"><link rel="canonical" href="${canonical}">
 <meta property="og:type" content="website"><meta property="og:site_name" content="Savyour"><meta property="og:locale" content="en_US">
 <meta property="og:title" content="${esc(page.title)}"><meta property="og:description" content="${esc(page.description)}"><meta property="og:url" content="${canonical}"><meta property="og:image" content="${site}/social-preview.png"><meta property="og:image:alt" content="Savyour — Your media. Your flow."><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(page.title)}"><meta name="twitter:description" content="${esc(page.description)}"><meta name="twitter:image" content="${site}/social-preview.png">
-<link rel="icon" type="image/svg+xml" href="${base}favicon.svg"><link rel="apple-touch-icon" href="${base}apple-touch-icon.png"><link rel="manifest" href="${base}site.webmanifest">
+<link rel="icon" type="image/svg+xml" href="${base}favicon.svg"><link rel="apple-touch-icon" href="${base}apple-touch-icon.png"><link rel="manifest" href="${base}site.webmanifest">${process.env.GOOGLE_SITE_VERIFICATION ? `<meta name="google-site-verification" content="${esc(process.env.GOOGLE_SITE_VERIFICATION)}">` : ''}
 <script type="application/ld+json">${json(schema)}</script>
-</head><body><div id="root"><main style="font:16px system-ui;background:#0a0613;color:#fff;min-height:100vh;padding:4rem;max-width:1100px;margin:auto"><nav aria-label="Main navigation">${links}</nav><h1>${esc(page.heading)}</h1><p>${esc(page.body)}</p>${extra[page.path]||''}</main></div><script type="module" src="/src/main.jsx"></script></body></html>`;
+</head><body><div id="boot" aria-hidden="true"><div><img src="${base}logo.svg" alt=""><span>Loading Savyour…</span></div></div><div id="root"><main style="font:16px system-ui;background:#0a0613;color:#fff;min-height:100vh;padding:4rem;max-width:1100px;margin:auto"><nav aria-label="Main navigation">${links}</nav><h1>${esc(page.heading)}</h1><p>${esc(page.body)}</p>${extra[page.path]||''}</main></div><script type="module" src="/src/main.jsx"></script></body></html>`;
   const destination = join(root, page.path, 'index.html');
   mkdirSync(resolve(destination, '..'), {recursive:true});
   writeFileSync(destination, html);

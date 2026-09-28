@@ -5,5 +5,5 @@ const root = process.cwd();
 export default defineConfig({
   plugins: [react()],
   base: process.env.GITHUB_PAGES_BASE || '/',
-  build: {rollupOptions: {input: Object.fromEntries(['', 'supported-sites', 'how-it-works', 'faq', 'about', ...['youtube','tiktok','instagram','facebook','x','vimeo','pinterest','reddit'].map(slug=>`platforms/${slug}`)].map(slug => [slug || 'home', resolve(root, slug, 'index.html')]))}},
+  build: {rollupOptions: {input: Object.fromEntries(['', 'supported-sites', 'how-it-works', 'faq', 'about', ...['youtube','tiktok','instagram','facebook','x','vimeo','pinterest','reddit'].map(slug=>`platforms/${slug}`), 'guides/thumbnail-but-download-fails', 'guides/video-quality-and-progress'].map(slug => [slug || 'home', resolve(root, slug, 'index.html')]))}},
 });
