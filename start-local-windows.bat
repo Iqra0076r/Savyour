@@ -1,6 +1,8 @@
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
+if not exist "backend\requirements.txt" goto missing_project
+if not exist "frontend\package.json" goto missing_project
 
 where py >nul 2>&1
 if %errorlevel%==0 (
@@ -56,5 +58,14 @@ pause
 exit /b 1
 :missing_node
 echo Node.js 22 or newer is required. Install it from https://nodejs.org/en/download
+pause
+exit /b 1
+:missing_project
+echo.
+echo The project folders were not found next to this launcher.
+echo Download the COMPLETE repository ZIP, then extract all files.
+echo Run this launcher from inside the extracted Savyour-main folder.
+echo Expected file: %CD%\backend\requirements.txt
+echo Repository ZIP: https://github.com/Iqra0076r/Savyour/archive/refs/heads/main.zip
 pause
 exit /b 1
